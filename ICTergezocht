@@ -1,0 +1,80 @@
+# https://realpython.com/beautiful-soup-web-scraper-python/
+
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+# instatiate lists to append to for dataframe/csv
+title = []
+company = []
+location = []
+#distance = []
+URL_add = []
+
+# instantiate website
+URL = "https://www.ictergezocht.nl/ict-vacatures/?what=Data+Analist&where=Amsterdam&r=10&submit_homesearch="
+# retrieve HTML of website
+page = requests.get(URL)
+
+# create Beautiful Soup object that takes scraped HTML content as input and use appropriate parser
+soup = BeautifulSoup(page.content, "html.parser")
+
+# find specific element by id - get all HTML contained within the <div> (identify by inpecting the HTML on the website with CTRL + SHIFT + I in Chrome; look for <div id = "  ">
+results = soup.find(id="list_result")
+# easy viewing by printing all the HTML:
+# print(results.prettify())
+
+# find elements by HTM class name
+job_elems = results.find_all("div", class_="content_block vacitem")
+
+# iterate over job_elems to look at specific details of each one
+# !! trailing underscore: class is a keyword, cannot be used as an argument name. hence add a trailing underscore (f you leave it out Python will throw you an exception as it thinks you're trying to instantiate a new class.)
+
+for job_elem in job_elems:
+    # print(job_elem, end="\n" * 2)
+    # returing the normal way returns all HTML, we only want the text content and strip leading and trailing white spaces
+    title_elem = job_elem.find("a", class_="title").text.strip()  # job_elem = type(class 'bs4.element.Tag') ; title_elem = type(str)
+    title.append(title_elem)  # in one line: title.append(job_elem.find("a", class_="title").text.strip())
+    company_elem = job_elem.find("span", class_="companyinfo").text.strip()
+    company.append(company_elem)
+
+    # location: more than just city in this element (city name, distance, education level, experience level (opt)): need to split and extract cityname
+    location_elem = job_elem.find("span", class_="specs").text.strip()
+    location_elem_split = location_elem.split()  # possible to add this directly to location_elem, but is it still readable then?
+    loc = location_elem_split[0]
+    location.append(loc)
+
+    #dist = location_elem_split[1]
+    # distance.append(dist)
+
+    # all in one line, =short, but readable?:
+    # location.append(job_elem.find("span", class_="specs").text.strip().split()[0])
+    # distance.append(job_elem.find("span", class_="specs").text.strip().split()[1])
+
+    URL_elem = job_elem.find_all("a", href=True)
+    for el in URL_elem:
+        URL_add.append(el["href"])
+
+    '''
+    alternative for URL (does work for ICTergezocht.nl not on monsterboard.com!?)
+    URL_elem = job_elem.find("a").get("href")  # 'a' = all hyperlinks, extracts only href (=URL), also when 'a' includes more information about the HTML element (class, src, etc.)
+    URL_add.append(URL_elem)
+    '''
+
+    # solve "AttributeError: 'NoneType' object has no attribute 'text'": some items have value None
+    if None in (title_elem, company_elem, location_elem, URL_elem):
+        continue
+'''
+print("Totaal aantal advertenties: ", len(job_elems))
+print("Title: ", title)
+print("Company: ", company)
+print("Location: ", location)
+print("URL: ", URL_add)
+'''
+# output in dataframe
+output = pd.DataFrame({"Title": title, "Company": company, "Location": location, "URL": URL_add})
+print(output)
+
+# output in CSV
+# voor CSV: separator aanpassen zodat komma in titel geen probleem geeft bij data naar kolommen in csv
+output.to_csv("icter.csv", sep="*")
